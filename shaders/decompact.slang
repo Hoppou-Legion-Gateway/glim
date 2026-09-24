@@ -114,6 +114,14 @@ void main(uint3 threadID: SV_DispatchThreadID)
     }
 
     // todo precalculate offsets
+    // Segment 0 always holds the ground-truth non-directional diffuse sum
+    // (direct light + direct/indirect emission, exactly as used by
+    // NonDirectional mode) and must be what lightmapType 0 exports in every
+    // mode. lightmap0offset/lightmap1offset instead point at the SH L0/L1
+    // (or raw dominant-direction) segments, which use a different weighting
+    // convention and are only valid as inputs to the direction/SH-ratio
+    // reconstruction below - not as the exported color value.
+    uint diffuseOffset = 0;
     uint lightmap0offset = 0;
     uint lightmap1offset = Push.compactedCount;
     if (LIGHTMAP_MODE == LightmapMode::CombinedSH)
@@ -134,38 +142,39 @@ void main(uint3 threadID: SV_DispatchThreadID)
         {
             DecompactTarget[linearIndex] = float4(0.5, 0.5, 0.5, 0.0);
         }
-        else
+        else if (Push.lightmapType == 1)
         {
             float4 dilatedDiffuse = 0.0;
             DilateLightmap(coords, lightmap0offset, dilatedDiffuse);
-            if (Push.lightmapType == 1)
-            {
-                float4 dilatedDirectional = 0.0;
-                DilateLightmap(coords, lightmap1offset, dilatedDirectional);
-                float4 encoded = EncodeDirectional(dilatedDirectional.xyz, dilatedDiffuse.rgb);
-                DecompactTarget[linearIndex] = float4(encoded.xyz, 0.0);
-            }
-            else if (Push.lightmapType == 3)
-            {
-                float4 dilatedSh = 0.0;
-                DilateLightmap(coords, lightmap1offset, dilatedSh);
-                float3 result = EncodeCombinedSH(dilatedDiffuse.rgb, dilatedSh.rgb);
+            float4 dilatedDirectional = 0.0;
+            DilateLightmap(coords, lightmap1offset, dilatedDirectional);
+            float4 encoded = EncodeDirectional(dilatedDirectional.xyz, dilatedDiffuse.rgb);
+            DecompactTarget[linearIndex] = float4(encoded.xyz, 0.0);
+        }
+        else if (Push.lightmapType == 3)
+        {
+            float4 dilatedL0 = 0.0;
+            DilateLightmap(coords, lightmap0offset, dilatedL0);
+            float4 dilatedSh = 0.0;
+            DilateLightmap(coords, lightmap1offset, dilatedSh);
+            float3 result = EncodeCombinedSH(dilatedL0.rgb, dilatedSh.rgb);
 
-                DecompactTarget[linearIndex] = float4(result, 0.0);
-            }
-            else
-            {
-                DecompactTarget[linearIndex] = float4(dilatedDiffuse.xyz, 0.0);
-            }
+            DecompactTarget[linearIndex] = float4(result, 0.0);
+        }
+        else
+        {
+            float4 dilatedDiffuse = 0.0;
+            DilateLightmap(coords, diffuseOffset, dilatedDiffuse);
+            DecompactTarget[linearIndex] = float4(dilatedDiffuse.xyz, 0.0);
         }
 
         return;
     }
 
     float3 diffuse = float3(
-        CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 0],
-        CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 1],
-        CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 2]);
+        CompactedLightmap[(compactIndex + diffuseOffset) * 3 + 0],
+        CompactedLightmap[(compactIndex + diffuseOffset) * 3 + 1],
+        CompactedLightmap[(compactIndex + diffuseOffset) * 3 + 2]);
 
     float4 visiblity = CompactedVisibility[compactIndex];
     float3 normalWS = UnpackNormalOctahedron(visiblity.w);
@@ -176,12 +185,17 @@ void main(uint3 threadID: SV_DispatchThreadID)
     }
     else if (Push.lightmapType == 1)
     {
+        float3 directionalDiffuse = float3(
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 0],
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 1],
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 2]);
+
         float3 directional = float3(
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 0],
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 1],
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 2]);
 
-        DecompactTarget[linearIndex] = EncodeDirectional(directional, diffuse);
+        DecompactTarget[linearIndex] = EncodeDirectional(directional, directionalDiffuse);
     }
     else if (Push.lightmapType == 2)
     {
@@ -197,12 +211,17 @@ void main(uint3 threadID: SV_DispatchThreadID)
     }
     else if (Push.lightmapType == 3)
     {
+        float3 shL0 = float3(
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 0],
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 1],
+            CompactedLightmap[(compactIndex + lightmap0offset) * 3 + 2]);
+
         float3 combined = float3(
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 0],
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 1],
             CompactedLightmap[(compactIndex + lightmap1offset) * 3 + 2]);
 
-        float3 result = EncodeCombinedSH(diffuse, combined);
+        float3 result = EncodeCombinedSH(shL0, combined);
 
         DecompactTarget[linearIndex] = float4(result, 1.0);
     }
