@@ -330,7 +330,7 @@ namespace Glim
                     .Distinct()
                     .ToArray();
 
-                var lightMeshMat = AssetDatabase.LoadAssetAtPath<Material>("Packages/io.github.z3y.glim/Editor/LightMesh.mat");
+                var lightMeshMat = AssetDatabase.LoadAssetAtPath<Material>("Packages/io.github.hoppou-legion-gateway.glim/Editor/LightMesh.mat");
 
                 foreach (var l in lights)
                 {

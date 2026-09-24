@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "revisionFormat": 2,
+  "entries": {
+    "topology/peer-seq": {
+      "key": "topology/peer-seq",
+      "value": {
+        "format": 1,
+        "next": 1
+      },
+      "version": 1,
+      "updatedAt": 1790237934261,
+      "updatedBy": {
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "main",
+        "kind": "main",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9"
+      }
+    },
+    "sessions/01a0d27d-ea5e-7a31-910d-5449f60d04c9": {
+      "key": "sessions/01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+      "value": {
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "GLI-1",
+        "label": "GLI-1",
+        "kind": "peer",
+        "status": "running",
+        "runner": "pi",
+        "transport": "host",
+        "cwd": "/home/admin/Builds/glim",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "model": "anthropic/claude-sonnet-5",
+        "thinking": "medium",
+        "startedAt": 1790247005868,
+        "updatedAt": 1790247033720,
+        "pendingMessages": false,
+        "local": false
+      },
+      "version": 2114,
+      "updatedAt": 1790247033720,
+      "updatedBy": {
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "main",
+        "kind": "main",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9"
+      }
+    },
+    "topology/participants/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886": {
+      "key": "topology/participants/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886",
+      "value": {
+        "format": 1,
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "kind": "root",
+        "rootId": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "ownerHostId": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "ownerIdentityId": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "main",
+        "status": "running",
+        "runner": "pi",
+        "transport": "host",
+        "capabilities": [
+          "steer",
+          "followUp",
+          "fabric"
+        ],
+        "cwd": "/home/admin/Builds/glim",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "model": "anthropic/claude-sonnet-5",
+        "thinking": "medium",
+        "startedAt": 1790247005868,
+        "updatedAt": 1790247033720,
+        "pendingMessages": false,
+        "controlProtocol": "v1",
+        "label": "GLI-1"
+      },
+      "version": 2115,
+      "updatedAt": 1790247033720,
+      "updatedBy": {
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "main",
+        "kind": "main",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9"
+      }
+    },
+    "topology/hosts/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886": {
+      "key": "topology/hosts/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886",
+      "value": {
+        "format": 1,
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "rootId": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "identity": {
+          "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+          "name": "main",
+          "kind": "main",
+          "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9"
+        },
+        "startedAt": 1790247005868,
+        "updatedAt": 1790247033721,
+        "expiresAt": 1790247048721
+      },
+      "version": 2116,
+      "updatedAt": 1790247033721,
+      "updatedBy": {
+        "id": "session:01a0d27d-ea5e-7a31-910d-5449f60d04c9",
+        "name": "main",
+        "kind": "main",
+        "sessionId": "01a0d27d-ea5e-7a31-910d-5449f60d04c9"
+      }
+    }
+  },
+  "highWater": 6340,
+  "versions": {
+    "topology/peer-seq": 1,
+    "sessions/01a0d27d-ea5e-7a31-910d-5449f60d04c9": 2114,
+    "topology/participants/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886": 2115,
+    "topology/hosts/1a2880afc0360f9d3f63cc0309d613f13962a1501ea4fa3f447a3f5c28d58886": 2116
+  },
+  "tombstoneOrder": []
+}
