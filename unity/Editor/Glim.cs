@@ -77,7 +77,7 @@ namespace Glim
     {
         public int id;
         public int indexStart;
-        public Vector3Int resolution;
+        public int probeCount;
     }
 
     public class BakeContext

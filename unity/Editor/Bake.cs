@@ -9,6 +9,10 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+#if VRC_LIGHT_VOLUMES_3
+using UnityEngine.SceneManagement;
+using VRCLightVolumes.Editor;
+#endif
 
 namespace Glim
 {
@@ -351,8 +355,8 @@ namespace Glim
                 }
                 AssetDatabase.MoveAsset(LightingData.TempLightingDataPath, destPath);
 
-#if VRC_LIGHT_VOLUMES
-                CreateLightVolumeTextures(_context, _context.outputDir);
+#if VRC_LIGHT_VOLUMES_3
+                SaveLightVolumeProbes(_context);
 #endif
 
 
@@ -431,127 +435,105 @@ namespace Glim
             bakeMessages.Clear();
         }
 
-        public static Vector4[] GenerateProbeVolume(Vector3 center, Vector3 size, Quaternion rotation, Vector3Int resolution)
+#if VRC_LIGHT_VOLUMES_3
+        // VRCLV only exposes custom-lightmapper probes through its primary Manager; non-primary Managers report zero volumes.
+        static VRCLightVolumes.LightVolumeManager FindLightVolumeManager(Scene scene)
         {
-            Vector4[] positions = new Vector4[resolution.x * resolution.y * resolution.z];
-
-            Vector3 texelSize = new(
-                size.x / resolution.x,
-                size.y / resolution.y,
-                size.z / resolution.z
-            );
-
-            Vector3 localOrigin = -size * 0.5f;
-            localOrigin += texelSize / 2.0f;
-
-            float radius = Mathf.Min(texelSize.x, texelSize.y, texelSize.z) / 2.0f;
-
-            int i = 0;
-            for (int z = 0; z < resolution.z; z++)
-                for (int y = 0; y < resolution.y; y++)
-                    for (int x = 0; x < resolution.x; x++)
-                    {
-                        Vector3 localPos = localOrigin + Vector3.Scale(new Vector3(x, y, z), texelSize);
-                        Vector3 worldPos = center + rotation * localPos;
-
-                        Vector4 probe = worldPos;
-                        probe.w = radius;
-                        positions[i++] = probe;
-                    }
-
-            return positions;
+            return scene.GetRootGameObjects()
+                .SelectMany(x => x.GetComponentsInChildren<VRCLightVolumes.LightVolumeManager>(true))
+                .FirstOrDefault(m => m.Editor.GetCustomProbesCount() > 0);
         }
 
-#if VRC_LIGHT_VOLUMES
-        static void AddLightProbeVolumes(GlimLightmapper baker, BakeContext ctx)
+        static void AddLightProbeVolumes(BakeContext ctx)
         {
-            var vrclv = ctx.scene.GetRootGameObjects().SelectMany(x => x.GetComponentsInChildren<VRCLightVolumes.LightVolume>(false)).ToArray();
-
-            for (int i = 0; i < vrclv.Length; i++)
+            var manager = FindLightVolumeManager(ctx.scene);
+            if (manager == null)
             {
-                var lv = vrclv[i];
-                var lvData = new LightProbeVolumeData
-                {
-                    indexStart = ctx.probePositions.Count,
-                    id = i,
-                    resolution = lv.Resolution,
-                };
-
-                ctx.probeVolumes.Add(lvData);
-                var volume = GenerateProbeVolume(lv.transform.position, lv.transform.lossyScale, lv.transform.rotation, lv.Resolution);
-                ctx.probePositions.AddRange(volume);
+                return;
             }
-        }
 
-        static void CreateLightVolumeTextures(BakeContext ctx, string directory)
-        {
-            var lvs = ctx.probeVolumes;
-            var vrclv = ctx.scene.GetRootGameObjects().SelectMany(x => x.GetComponentsInChildren<VRCLightVolumes.LightVolume>(false)).ToArray();
+            // Mirrors VRCLV's custom probe ID order (LightVolumeManagerEditorBackend.IsCustomProbeVolume) so each ID resolves to its volume.
+            var volumes = manager.LightVolumeInstances
+                .Where(v => v != null && v.Bake && v.gameObject.activeInHierarchy && !v.CompareTag("EditorOnly"))
+                .ToArray();
 
-            for (int volumeIndex = 0; volumeIndex < lvs.Count; volumeIndex++)
+            int volumeCount = manager.Editor.GetCustomProbesCount();
+            if (volumes.Length != volumeCount)
             {
-                var data = lvs[volumeIndex];
+                Debug.LogError($"Light Volume ID mismatch: VRCLV reports {volumeCount} bakeable volumes, found {volumes.Length}. Light volumes were skipped");
+                return;
+            }
 
-                int w = data.resolution.x;
-                int h = data.resolution.y;
-                int d = data.resolution.z;
-
-                int probeCount = w * h * d;
-
-                TextureFormat format = TextureFormat.RGBAHalf;
-                Texture3D tex0 = new(w, h, d, format, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-                Texture3D tex1 = new(w, h, d, format, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-                Texture3D tex2 = new(w, h, d, format, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-
-                Color[] tex0Col = new Color[probeCount];
-                Color[] tex1Col = new Color[probeCount];
-                Color[] tex2Col = new Color[probeCount];
-
-                float coeff = 1.0f;// todo
-                // float coeff = 1.7699115f;// todo
-
-                int pixelIndex = 0;
-                for (int i = data.indexStart; i < data.indexStart + probeCount; i++)
+            for (int id = 0; id < volumeCount; id++)
+            {
+                // GetCustomProbes recalculates the volume resolution, so read it afterwards.
+                Vector3[] positions = manager.Editor.GetCustomProbes(id);
+                var volume = volumes[id];
+                Vector3Int resolution = volume.Resolution;
+                if (positions.Length == 0 || positions.Length != resolution.x * resolution.y * resolution.z)
                 {
-                    var probe = _bakeProbesResults[i];
-
-                    var L0 = probe.L0;
-                    var L1x = probe.L11;
-                    var L1y = probe.L1_1;
-                    var L1z = probe.L10;
-
-                    var L1r = new Vector3(L1x.x, L1y.x, L1z.x);
-                    var L1g = new Vector3(L1x.y, L1y.y, L1z.y);
-                    var L1b = new Vector3(L1x.z, L1y.z, L1z.z);
-
-                    tex0Col[pixelIndex] = new Color(L0.x, L0.y, L0.z, L1r.z * coeff);
-                    tex1Col[pixelIndex] = new Color(L1r.x * coeff, L1g.x * coeff, L1b.x * coeff, L1g.z * coeff);
-                    tex2Col[pixelIndex] = new Color(L1r.y * coeff, L1g.y * coeff, L1b.y * coeff, L1b.z * coeff);
-
-                    pixelIndex++;
+                    Debug.LogError($"Light Volume {volume.name} probe count does not match its resolution, skipped", volume);
+                    continue;
                 }
 
-                tex0.SetPixels(tex0Col);
-                tex1.SetPixels(tex1Col);
-                tex2.SetPixels(tex2Col);
+                // Half of the smallest world-space voxel dimension, including axes with a single voxel.
+                Vector3 scale = VRCLightVolumes.LightVolumeTools.GetScale(volume);
+                float radius = Mathf.Min(
+                    Mathf.Abs(scale.x) / resolution.x,
+                    Mathf.Abs(scale.y) / resolution.y,
+                    Mathf.Abs(scale.z) / resolution.z) * 0.5f;
 
-                AssetDatabase.CreateAsset(tex0, Path.Combine(directory, $"LightProbeVolume_{volumeIndex}-0.asset"));
-                AssetDatabase.CreateAsset(tex1, Path.Combine(directory, $"LightProbeVolume_{volumeIndex}-1.asset"));
-                AssetDatabase.CreateAsset(tex2, Path.Combine(directory, $"LightProbeVolume_{volumeIndex}-2.asset"));
+                ctx.probeVolumes.Add(new LightProbeVolumeData
+                {
+                    id = id,
+                    indexStart = ctx.probePositions.Count,
+                    probeCount = positions.Length,
+                });
 
-                var lv = vrclv[volumeIndex];
-                lv.Texture0 = tex0;
-                lv.Texture1 = tex1;
-                lv.Texture2 = tex2;
-                EditorUtility.SetDirty(lv);
+                foreach (var position in positions)
+                {
+                    Vector4 probe = position;
+                    probe.w = radius;
+                    ctx.probePositions.Add(probe);
+                }
             }
+        }
 
-            var lvSetup = ctx.scene.GetRootGameObjects().SelectMany(x => x.GetComponentsInChildren<VRCLightVolumes.LightVolumeSetup>(false)).FirstOrDefault();
-            if (lvSetup)
+        static void SaveLightVolumeProbes(BakeContext ctx)
+        {
+            if (ctx.probeVolumes.Count == 0)
             {
-                lvSetup.GenerateAtlas();
+                return;
             }
 
+            var manager = FindLightVolumeManager(ctx.scene);
+            if (manager == null)
+            {
+                Debug.LogError("Light Volume Manager is missing, baked light volumes were discarded");
+                return;
+            }
+
+            foreach (var data in ctx.probeVolumes)
+            {
+                var l0 = new Vector3[data.probeCount];
+                var l1r = new Vector3[data.probeCount];
+                var l1g = new Vector3[data.probeCount];
+                var l1b = new Vector3[data.probeCount];
+
+                for (int i = 0; i < data.probeCount; i++)
+                {
+                    var probe = _bakeProbesResults[data.indexStart + i];
+
+                    // VRCLV expects L1 per color channel ordered as (x, y, z) = (L11, L1-1, L10), matching Unity's SH layout.
+                    l0[i] = probe.L0;
+                    l1r[i] = new Vector3(probe.L11.x, probe.L1_1.x, probe.L10.x);
+                    l1g[i] = new Vector3(probe.L11.y, probe.L1_1.y, probe.L10.y);
+                    l1b[i] = new Vector3(probe.L11.z, probe.L1_1.z, probe.L10.z);
+                }
+
+                // VRCLV writes the textures, then regenerates its atlas once every volume is stored.
+                manager.Editor.SetCustomProbesBaked(data.id, l0, l1r, l1g, l1b);
+            }
         }
 #endif
 
@@ -584,8 +566,8 @@ namespace Glim
             _ambientProbeIndex = ctx.probePositions.Count;
             ctx.probePositions.Add(new Vector4(10000.0f, 10000.0f, 10000.0f, 0.0f));
 
-#if VRC_LIGHT_VOLUMES
-            AddLightProbeVolumes(baker, ctx);
+#if VRC_LIGHT_VOLUMES_3
+            AddLightProbeVolumes(ctx);
 #endif
 
             _context = ctx;

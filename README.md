@@ -41,7 +41,7 @@ Easy to use, lightweight (only ~1MB) and works with Unity light components.
 - [x] Emissive Materials with Multiple Importance Sampling
 - [x] Seam stitching with a least squares solver
 - [x] L2 Spherical Harmonics Light Probes
-- [x] VRC Light Volumes
+- [x] VRC Light Volumes (3.0.0-dev.20+)
 - [x] Lightmap Groups
 - [ ] Terrain Trees Support
 - [x] Mixed Lights
